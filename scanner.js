@@ -1,8 +1,10 @@
+// scanner.js (最新版)
+
 document.addEventListener('DOMContentLoaded', () => {
     const userEmailDisplay = document.getElementById('user-email-display');
     const resultsDisplay = document.getElementById('qr-reader-results');
     
-    // 1. URLからユーザーEmailを取得し表示
+    // 1. URLパラメータからユーザーのEmailを取得し、画面に表示します
     const urlParams = new URLSearchParams(window.location.search);
     const userEmail = urlParams.get('userEmail');
 
@@ -14,28 +16,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     userEmailDisplay.textContent = `参加者: ${userEmail}`;
 
-    // 2. スキャナーの初期化
+    // 2. QRコードリーダーを初期化します
     const html5QrCode = new Html5Qrcode("qr-reader");
     const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-    // 3. スキャン成功時のコールバック関数
+    // 3. スキャンが成功したときの処理を定義します
     const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-        // スキャン成功音を鳴らす（任意）
-        // new Audio('success.mp3').play();
-        
-        // スキャナーを停止
+        // スキャナーを停止して、カメラをオフにします
         html5QrCode.stop().then(() => {
             console.log("QR Code scanning is stopped.");
             resultsDisplay.textContent = 'サーバーにスタンプ情報を送信中...';
             resultsDisplay.className = 'info';
-            // サーバーにデータを送信
+            
+            // サーバーにスキャンデータを送信します
             sendDataToServer(userEmail, decodedText);
+
         }).catch(err => {
             console.error("Failed to stop the scanner.", err);
         });
     };
 
-    // 4. スキャナーを開始
+    // 4. スキャナーを開始します
     html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
         .catch(err => {
             resultsDisplay.textContent = 'カメラの起動に失敗しました。権限を確認してください。';
@@ -44,19 +45,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 });
 
-// 5. セキュリティサーバーへデータを送信する関数
+/**
+ * 取得したデータをVercel上のセキュリティサーバーに送信する関数
+ * @param {string} email - ユーザーのEmailアドレス
+ * @param {string} qrData - QRコードから読み取ったデータ（SpotのRow ID）
+ */
 async function sendDataToServer(email, qrData) {
     const resultsDisplay = document.getElementById('qr-reader-results');
-    // ⚠️ 必ず自身のGoogle Cloud FunctionのトリガーURLに置き換えてください
-    const serverUrl = 'https://<YOUR_SECURITY_SERVER_URL>'; 
+    
+    // ↓↓↓↓↓↓【重要】ご自身のVercelのURLに必ず書き換えてください↓↓↓↓↓↓
+    const serverUrl = 'https://shimonoseki-stamprally.vercel.app//api'; 
+    // 例: https://glide-qr-scanner-tanaka.vercel.app/api
 
     try {
         const response = await fetch(serverUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify({
                 userEmail: email,
-                scannedQrData: qrData, // QRコードの中身（SPOT Row ID）
+                scannedQrData: qrData,
             }),
         });
 
