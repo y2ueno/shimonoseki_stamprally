@@ -1,21 +1,18 @@
-// /api/index.js (CORS設定 最終確認版)
+// /api/index.js (cURLコマンド準拠 最終FIX版)
 
 import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
-    // ↓↓↓↓↓↓【重要】ここがCORS設定です↓↓↓↓↓↓
-    // エラーメッセージに表示された 'origin' と完全に一致させます
+    // CORS設定
     res.setHeader('Access-Control-Allow-Origin', 'https://y2ueno.github.io');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    // ↑↑↑↑↑↑【重要】ここまでがCORS設定です↑↑↑↑↑↑
 
-    // ブラウザが本番のPOSTリクエストを送る前に行う「事前確認（preflight）」に応答します
+    // preflightリクエストへの応答
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
     
-    // (これ以降のコードは変更ありません)
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed.' });
     }
@@ -40,10 +37,12 @@ export default async function handler(req, res) {
             "kind": "add-row-to-table",
             "tableName": "スタンプラリー202508",
             "columnValues": {
-                "Timestamp": new Date().toISOString(),
-                "User Email": userEmail,
-                "Spot ID": scannedQrData,
-                "取得QRコード": scannedQrData
+                // ↓↓↓↓↓↓【最終FIX】cURLコマンドのキーに完全に一致させました↓↓↓↓↓↓
+                "取得QRコード": scannedQrData,
+                "スタンプ": new Date().toISOString(),         // 「Timestamp」列のキーは「スタンプ」
+                "fbbde0f492a8b3fa23261d9492872fd4": userEmail, // 「User Email」列のキーは内部ID
+                "抽選": scannedQrData                       // 「Spot ID」列のキーは「抽選」
+                // ↑↑↑↑↑↑【最終FIX】ここまで↑↑↑↑↑↑
             }
         }]
     };
