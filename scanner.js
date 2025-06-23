@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function sendDataToServer(email, qrData) {
     const resultsDisplay = document.getElementById('qr-reader-results');
-    const serverUrl = 'https://<YOUR_PROJECT_NAME>.vercel.app/api'; 
+    const serverUrl = 'https://shimonoseki-stamprally.vercel.app/api'; 
 
     try {
         const response = await fetch(serverUrl, {
