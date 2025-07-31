@@ -1,7 +1,7 @@
 {
-  "name": "glide-stamp-rally-server",
+  "name": "glide-sheet-writer-server",
   "version": "1.0.0",
   "dependencies": {
-    "node-fetch": "^2.6.7"
+    "googleapis": "^105.0.0"
   }
 }
