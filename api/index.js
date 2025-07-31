@@ -1,6 +1,4 @@
-// /api/index.js (cURLコマンド準拠 最終FIX版)
-
-import fetch from 'node-fetch';
+import { google } from 'googleapis';
 
 export default async function handler(req, res) {
     // CORS設定
@@ -8,65 +6,56 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // preflightリクエストへの応答
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
-    if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method Not Allowed.' });
-    }
+    if (req.method === 'OPTIONS') { return res.status(200).end(); }
+    if (req.method !== 'POST') { return res.status(405).end(); }
 
     const { userEmail, scannedQrData } = req.body;
 
     if (!userEmail || !scannedQrData) {
-        return res.status(400).json({ message: 'Missing userEmail or scannedQrData.' });
+        return res.status(400).json({ message: 'Missing data.' });
     }
-
-    const endpoint = process.env.GLIDE_API_ENDPOINT;
-    const token = process.env.GLIDE_BEARER_TOKEN;
-
-    if (!endpoint || !token) {
-        console.error("Server configuration error: Missing environment variables.");
-        return res.status(500).json({ message: 'Server configuration error.' });
-    }
-
-    const payload = {
-        "appID": "z5JvTxehlDjcHwp9m8lz",
-        "mutations": [{
-            "kind": "add-row-to-table",
-            "tableName": "スタンプラリー202508",
-            "columnValues": {
-                // ↓↓↓↓↓↓【最終FIX】cURLコマンドのキーに完全に一致させました↓↓↓↓↓↓
-                "取得QRコード": scannedQrData,
-                "スタンプ": new Date().toISOString(),         // 「Timestamp」列のキーは「スタンプ」
-                "fbbde0f492a8b3fa23261d9492872fd4": userEmail, // 「User Email」列のキーは内部ID
-                "抽選": scannedQrData                       // 「Spot ID」列のキーは「抽選」
-                // ↑↑↑↑↑↑【最終FIX】ここまで↑↑↑↑↑↑
-            }
-        }]
-    };
 
     try {
-        const glideResponse = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+        const auth = new google.auth.GoogleAuth({
+            credentials: {
+                client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+                private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
             },
-            body: JSON.stringify(payload)
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
         });
 
-        if (!glideResponse.ok) {
-            const errorText = await glideResponse.text();
-            console.error(`Glide API Error: ${errorText}`);
-            throw new Error(`Failed to write to Glide.`);
-        }
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        // ↓↓↓↓↓↓【重要】ご自身のスプレッドシートIDに書き換えてください↓↓↓↓↓↓
+        const spreadsheetId = '1loWqEoGPSszUtpEeFBN6HjKFz1_bz9Ig7rEx5gyA7Hw';
+        // ↑↑↑↑↑↑【重要】ご自身のスプレッドシートIDに書き換えてください↑↑↑↑↑↑
+
+        const range = 'スタンプラリー202508';
+
+        const uniqueRowId = `${new Date().getTime()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        const newRow = [
+            scannedQrData,
+            new Date().toISOString(),
+            userEmail,
+            scannedQrData,
+            '',
+            uniqueRowId,
+        ];
+
+        await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values: [newRow],
+            },
+        });
 
         res.status(200).json({ message: 'Successfully added stamp.' });
 
     } catch (error) {
-        console.error('Error forwarding to Glide:', error);
+        console.error('Error writing to Google Sheets:', error);
         res.status(500).json({ message: 'Internal Server Error.' });
     }
 }
