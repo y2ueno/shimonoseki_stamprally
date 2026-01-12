@@ -33,16 +33,20 @@ function onScanSuccess(decodedText, decodedResult) {
 
     // 3. Vercel API へデータを送信
     // ボディには参加者のメールアドレスと読み取ったQRコードのテキストを含める
-    fetch(VERCEL_API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            email: userEmail,
-            qrData: decodedText
-        })
-    })
+    // scanner.js の fetch 部分を以下に差し替え
+fetch(VERCEL_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: userEmail, qrData: decodedText })
+})
+.then(response => {
+    // エラー番号をアラートに出すように変更
+    if (!response.ok) {
+        throw new Error('サーバーエラー発生: ステータスコード ' + response.status);
+    }
+    return response.json();
+})
+// ...（以下はそのまま）
     .then(response => {
         if (!response.ok) {
             throw new Error('ネットワーク応答が正常ではありませんでした。');
