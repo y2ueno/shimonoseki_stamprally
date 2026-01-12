@@ -65,13 +65,13 @@ function onScanSuccess(decodedText, decodedResult) {
         // 次のスキャンのためにページをリロードして状態をリセット
         window.location.reload();
     })
-    .catch(error => {
-        console.error('通信エラー:', error);
-        alert("通信エラーが発生しました。電波の良い場所で再度お試しいただくか、URL設定を確認してください。");
-        
-        // エラー時もリロードしてスキャナーを復旧させる
-        window.location.reload();
-    });
+    // scanner.js の catch 部分を一時的に以下に変更
+.catch(error => {
+    console.error('Error Details:', error);
+    // 汎用的なメッセージではなく、errorの中身を直接表示させる
+    alert("詳細エラー報告:\n" + error.name + ": " + error.message);
+    window.location.reload();
+});
 }
 
 /**
