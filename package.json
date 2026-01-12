@@ -11,6 +11,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@glideapps/tables": "^1.2.1"
+    "@glideapps/tables": "latest"
   }
 }
