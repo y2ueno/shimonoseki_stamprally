@@ -1,23 +1,39 @@
 /**
- * QRコードスキャン成功時の処理
+ * scanner.js
+ * 第2回 からまちスタンプラリー (202508) 専用
+ * スキャン結果を Vercel API 経由で Glide Tables へ記録します
+ */
+
+// --- 設定エリア ---
+// あなたの Vercel プロジェクトの API エンドポイント URL
+const VERCEL_API_URL = 'https://shimonoseki-stamprally.vercel.app/api';
+
+/**
+ * QRコードスキャン成功時のコールバック関数
  */
 function onScanSuccess(decodedText, decodedResult) {
-    // 1. URLからメールアドレスを取得
+    // 1. URLクエリパラメータから参加者のメールアドレスを取得
     const urlParams = new URLSearchParams(window.location.search);
     const userEmail = urlParams.get('email');
 
+    // メールアドレスがない場合はエラーを表示して中断
     if (!userEmail) {
-        alert("エラー：参加者情報（メールアドレス）が取得できません。アプリから開き直してください。");
+        alert("エラー：参加者情報（メールアドレス）が不足しています。アプリのスタンプラリー画面から再度開き直してください。");
         return;
     }
 
-    // 二重送信防止のためスキャナーを停止
+    console.log(`スキャン成功: ${decodedText}`);
+
+    // 2. 多重送信を防ぐためにスキャナーを一時停止（クリア）
     if (window.html5QrcodeScanner) {
-        window.html5QrcodeScanner.clear().catch(err => console.error("Scanner stop error:", err));
+        window.html5QrcodeScanner.clear().catch(err => {
+            console.error("スキャナーの停止に失敗しました:", err);
+        });
     }
 
-    // 2. 自作APIへデータを送信
-    fetch('/api', {
+    // 3. Vercel API へデータを送信
+    // ボディには参加者のメールアドレスと読み取ったQRコードのテキストを含める
+    fetch(VERCEL_API_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -27,40 +43,59 @@ function onScanSuccess(decodedText, decodedResult) {
             qrData: decodedText
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('ネットワーク応答が正常ではありませんでした。');
+        }
+        return response.json();
+    })
     .then(data => {
+        // 4. API からのレスポンスに基づいたメッセージ表示
         if (data.duplicate) {
-            // 重複していた場合
-            alert("このスポットのスタンプはすでに取得済みです");
+            // すでに取得済みのスタンプだった場合
+            alert("このスポットのスタンプはすでに取得済みです。");
         } else if (data.success) {
-            // 新規登録成功
+            // 新規取得に成功した場合
             alert(`スタンプ「${decodedText}」を獲得しました！`);
         } else {
-            // その他のエラー
+            // API側で何らかのエラーが発生した場合
             alert("エラーが発生しました: " + (data.message || "不明なエラー"));
         }
-        
-        // 画面をリロードしてスキャナーを再準備
+
+        // 次のスキャンのためにページをリロードして状態をリセット
         window.location.reload();
     })
     .catch(error => {
-        console.error('Fetch Error:', error);
-        alert("通信エラーが発生しました。電波の良い場所で再度お試しください。");
+        console.error('通信エラー:', error);
+        alert("通信エラーが発生しました。電波の良い場所で再度お試しいただくか、URL設定を確認してください。");
+        
+        // エラー時もリロードしてスキャナーを復旧させる
         window.location.reload();
     });
 }
 
 /**
- * スキャナーの初期化
+ * QRコードスキャン失敗時（読み取り中）のコールバック
+ * (頻繁に呼ばれるため、基本は何も処理しない)
+ */
+function onScanFailure(error) {
+    // console.warn(`QRコード読み取り中...`);
+}
+
+/**
+ * ページ読み込み完了時にスキャナーを起動
  */
 window.addEventListener('DOMContentLoaded', () => {
+    // インスタンスをグローバル変数に保持
     window.html5QrcodeScanner = new Html5QrcodeScanner(
         "qr-reader", 
         { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            rememberLastUsedCamera: true
+            fps: 10,           // 1秒間に10回スキャン試行
+            qrbox: { width: 250, height: 250 }, // スキャンエリアのサイズ
+            rememberLastUsedCamera: true         // 最後に使ったカメラを記憶
         }
     );
-    window.html5QrcodeScanner.render(onScanSuccess);
+    
+    // スキャナーの描画開始
+    window.html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 });
