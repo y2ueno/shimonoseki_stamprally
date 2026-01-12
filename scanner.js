@@ -1,71 +1,66 @@
-// scanner.js (emailパラメータ対応版)
-
-document.addEventListener('DOMContentLoaded', () => {
-    const userEmailDisplay = document.getElementById('user-email-display');
-    const resultsDisplay = document.getElementById('qr-reader-results');
-    
-    // ↓↓↓↓↓↓ ここを 'userEmail' から 'email' に変更しました ↓↓↓↓↓↓
+/**
+ * QRコードスキャン成功時の処理
+ */
+function onScanSuccess(decodedText, decodedResult) {
+    // 1. URLからメールアドレスを取得
     const urlParams = new URLSearchParams(window.location.search);
-    const email = urlParams.get('email'); // 'userEmail' から 'email' に変更
-    // ↑↑↑↑↑↑ ここを 'userEmail' から 'email' に変更しました ↑↑↑↑↑↑
+    const userEmail = urlParams.get('email');
 
-    if (!email) {
-        userEmailDisplay.textContent = '参加者情報が取得できませんでした';
-        resultsDisplay.textContent = 'アプリから再度お試しください。';
-        resultsDisplay.className = 'error';
+    if (!userEmail) {
+        alert("エラー：参加者情報（メールアドレス）が取得できません。アプリから開き直してください。");
         return;
     }
-    userEmailDisplay.textContent = `参加者: ${email}`;
 
-    // (これ以降のコードは変更ありません)
-
-    const html5QrCode = new Html5Qrcode("qr-reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-    const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-        html5QrCode.stop().then(() => {
-            console.log("QR Code scanning is stopped.");
-            resultsDisplay.textContent = 'サーバーにスタンプ情報を送信中...';
-            resultsDisplay.className = 'info';
-            sendDataToServer(email, decodedText);
-        }).catch(err => {
-            console.error("Failed to stop the scanner.", err);
-        });
-    };
-
-    html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
-        .catch(err => {
-            resultsDisplay.textContent = 'カメラの起動に失敗しました。権限を確認してください。';
-            resultsDisplay.className = 'error';
-            console.error("Unable to start scanning.", err);
-        });
-});
-
-async function sendDataToServer(email, qrData) {
-    const resultsDisplay = document.getElementById('qr-reader-results');
-    const serverUrl = 'https://shimonoseki-stamprally.vercel.app/api'; 
-
-    try {
-        const response = await fetch(serverUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', },
-            body: JSON.stringify({
-                userEmail: email, // 送信するJSONのキーは 'userEmail' のままでOKです
-                scannedQrData: qrData,
-            }),
-        });
-
-        if (response.ok) {
-            resultsDisplay.textContent = 'スタンプをゲットしました！🎉 このページを閉じてください。';
-            resultsDisplay.className = 'success';
-        } else {
-            const error = await response.json();
-            resultsDisplay.textContent = `エラー: ${error.message || '登録に失敗しました'}`;
-            resultsDisplay.className = 'error';
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        resultsDisplay.textContent = 'サーバー通信エラー。管理者に連絡してください。';
-        resultsDisplay.className = 'error';
+    // 二重送信防止のためスキャナーを停止
+    if (window.html5QrcodeScanner) {
+        window.html5QrcodeScanner.clear().catch(err => console.error("Scanner stop error:", err));
     }
+
+    // 2. 自作APIへデータを送信
+    fetch('/api', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            email: userEmail,
+            qrData: decodedText
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.duplicate) {
+            // 重複していた場合
+            alert("このスポットのスタンプはすでに取得済みです");
+        } else if (data.success) {
+            // 新規登録成功
+            alert(`スタンプ「${decodedText}」を獲得しました！`);
+        } else {
+            // その他のエラー
+            alert("エラーが発生しました: " + (data.message || "不明なエラー"));
+        }
+        
+        // 画面をリロードしてスキャナーを再準備
+        window.location.reload();
+    })
+    .catch(error => {
+        console.error('Fetch Error:', error);
+        alert("通信エラーが発生しました。電波の良い場所で再度お試しください。");
+        window.location.reload();
+    });
 }
+
+/**
+ * スキャナーの初期化
+ */
+window.addEventListener('DOMContentLoaded', () => {
+    window.html5QrcodeScanner = new Html5QrcodeScanner(
+        "qr-reader", 
+        { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            rememberLastUsedCamera: true
+        }
+    );
+    window.html5QrcodeScanner.render(onScanSuccess);
+});
