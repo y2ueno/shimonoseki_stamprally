@@ -1,81 +1,91 @@
 /**
  * scanner.js
- * 参加者情報の取得からスキャナーの起動、API送信までをすべて含みます
+ * Google Apps Script (GAS) 連携版
+ * 第2回 からまちスタンプラリー (202508)
  */
 
-const VERCEL_API_URL = 'https://shimonoseki-stamprally.vercel.app/api';
+// --- 設定エリア ---
+// あなたの GAS ウェブアプリの URL
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbw-teQvWo5FZpUXPKdoxpYivXaRc-XEdQkI4tIDV8bzFP5r4G-HbjSYa1o2WLuF2gTtkQ/exec';
 
 /**
- * QRコードスキャン成功時の処理
+ * QRコードスキャン成功時のコールバック
  */
-async function onScanSuccess(decodedText, decodedResult) {
+function onScanSuccess(decodedText, decodedResult) {
+    // 1. URLパラメータからメールアドレスを取得
     const urlParams = new URLSearchParams(window.location.search);
     const userEmail = urlParams.get('email');
 
     if (!userEmail) {
-        alert("エラー：URLにemailが含まれていません。アプリから開き直してください。");
+        alert("エラー：参加者のメールアドレスが取得できません。アプリから開き直してください。");
         return;
     }
 
-    // 二重送信防止のため停止
+    console.log(`QR読み取り成功: ${decodedText}`);
+
+    // 2. 二重送信防止のためスキャナーを停止
     if (window.html5QrcodeScanner) {
-        await window.html5QrcodeScanner.clear().catch(e => console.error(e));
+        window.html5QrcodeScanner.clear().catch(err => {
+            console.error("スキャナー停止エラー:", err);
+        });
     }
 
-    console.log("スキャン成功:", decodedText);
-
-    // Vercel APIへ送信
-    fetch(VERCEL_API_URL, {
+    // 3. GAS (Google Apps Script) へデータを送信
+    // GASのdoPostで処理するため、POSTメソッドでJSONを送信します
+    fetch(GAS_API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail, qrData: decodedText })
+        // GASは CORS の関係で標準的な JSON 送信を行うために、bodyに文字列を渡します
+        body: JSON.stringify({
+            email: userEmail,
+            qrData: decodedText
+        })
     })
-    .then(async response => {
-        // ここでエラー番号を確実に取得します
+    .then(response => {
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`番号: ${response.status}\n内容: ${errorText}`);
+            throw new Error('ネットワーク応答が正常ではありませんでした。');
         }
         return response.json();
     })
     .then(data => {
+        // 4. GAS側からのレスポンス（duplicate/success）に応じたアラート表示
         if (data.duplicate) {
             alert("このスポットのスタンプはすでに取得済みです。");
         } else if (data.success) {
             alert(`スタンプ「${decodedText}」を獲得しました！`);
         } else {
-            alert("記録に失敗しました: " + (data.message || "不明なエラー"));
+            alert("エラーが発生しました: " + (data.message || "不明なエラー"));
         }
+
+        // 5. 状態をリセットするためにページをリロード
         window.location.reload();
     })
     .catch(error => {
-        alert("詳細エラー報告:\n" + error.message);
+        console.error('通信エラー:', error);
+        alert("通信エラーが発生しました。電波の良い場所で再度お試しください。");
         window.location.reload();
     });
 }
 
 /**
- * 読み取り失敗時（無視してOK）
+ * スキャン失敗時（スキャン中）の処理
  */
 function onScanFailure(error) {
-    // console.warn(error);
+    // 読み取り中はコンソールを汚さないため何もしない
 }
 
 /**
- * 【重要】ページが読み込まれたらスキャナーを起動する設定
+ * ページ読み込み完了時にスキャナーをセットアップ
  */
 window.addEventListener('DOMContentLoaded', () => {
-    console.log("スキャナー初期化中...");
-    
-    // index.html の email 表示部分を更新（もし存在すれば）
+    // URLからメールアドレスを取得して画面に表示（確認用）
     const urlParams = new URLSearchParams(window.location.search);
     const userEmail = urlParams.get('email');
     const displayEl = document.getElementById('user-email-display');
-    if (displayEl) {
-        displayEl.innerText = userEmail ? `参加者: ${userEmail}` : "参加者情報がありません";
+    if (displayEl && userEmail) {
+        displayEl.innerText = `参加者: ${userEmail}`;
     }
 
-    // スキャナーの起動
+    // スキャナーの初期化
     window.html5QrcodeScanner = new Html5QrcodeScanner(
         "qr-reader", 
         { 
@@ -84,5 +94,7 @@ window.addEventListener('DOMContentLoaded', () => {
             rememberLastUsedCamera: true
         }
     );
+    
+    // レンダリング開始
     window.html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 });
