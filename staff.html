@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>応募受付スキャナー（スタッフ専用）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #1a237e;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        #qr-reader-container {
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            box-sizing: border-box;
+        }
+        #qr-reader {
+            width: 100%;
+            border: 2px dashed #7986cb;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        #staff-info-display {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #fff9c4; /* 黄色系でスタッフ用であることを明示 */
+            color: #f57f17;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        #qr-reader-results {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+            padding: 12px;
+            border-radius: 6px;
+            word-break: break-all;
+            font-size: 0.95em;
+            min-height: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #qr-reader-results.info { background-color: #e3f2fd; color: #1e88e5; }
+        #qr-reader-results.success { background-color: #e8f5e9; color: #43a047; }
+        #qr-reader-results.error { background-color: #ffebee; color: #e53935; }
+        
+        button {
+            margin-top: 10px;
+            padding: 8px 20px;
+            background-color: #1a237e;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>応募受付スキャナー</h1>
+
+    <div id="qr-reader-container">
+        <div id="staff-info-display">スタッフ確認中...</div>
+        <div id="qr-reader"></div>
+        <div id="qr-reader-results" class="info">参加者のQRコードをスキャンしてください</div>
+    </div>
+
+    <script>
+        // --- 設定エリア ---
+        const VERCEL_ENDPOINT = "https://shimonoseki-stamprally.vercel.app/api/post";
+
+        // URLパラメータからスタッフEmailを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const staffEmail = urlParams.get('staff_email') || "不明なスタッフ";
+        document.getElementById('staff-info-display').textContent = "担当スタッフ: " + staffEmail;
+
+        const resultContainer = document.getElementById('qr-reader-results');
+        let isProcessing = false;
+
+        // スキャン成功時の処理
+        function onScanSuccess(decodedText) {
+            if (isProcessing) return; // 二重送信防止
+            isProcessing = true;
+
+            // スキャナーを一時停止
+            html5QrcodeScanner.pause(true);
+
+            resultContainer.className = "info";
+            resultContainer.innerHTML = "データ送信中...";
+
+            // Vercelへ送信
+            fetch(VERCEL_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_email: decodedText,
+                    staff_email: staffEmail
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success" || data.success) {
+                    resultContainer.className = "success";
+                    resultContainer.innerHTML = `
+                        <div>✅ 受付完了！</div>
+                        <div style="font-size:0.8em; margin-top:5px;">ID: ${data.appId || '記録済み'}</div>
+                        <button onclick="resetScanner()">次の人をスキャン</button>
+                    `;
+                } else {
+                    throw new Error(data.message || "送信エラー");
+                }
+            })
+            .catch(error => {
+                resultContainer.className = "error";
+                resultContainer.innerHTML = `
+                    <div>❌ エラー: ${error.message}</div>
+                    <button onclick="resetScanner()">再試行</button>
+                `;
+            });
+        }
+
+        function resetScanner() {
+            isProcessing = false;
+            resultContainer.className = "info";
+            resultContainer.innerHTML = "QRコードをスキャンしてください";
+            html5QrcodeScanner.resume();
+        }
+
+        // スキャナーの起動
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+            "qr-reader", { fps: 10, qrbox: 250 }
+        );
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+</body>
+</html>
