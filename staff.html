@@ -23,7 +23,7 @@
         }
         #qr-reader-results {
             margin-top: 15px; text-align: center; font-weight: bold; padding: 12px;
-            border-radius: 6px; word-break: break-all; font-size: 1em; min-height: 60px;
+            border-radius: 6px; word-break: break-all; font-size: 1em; min-height: 80px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         #qr-reader-results.info { background-color: #e3f2fd; color: #1e88e5; }
@@ -34,7 +34,9 @@
         .next-btn {
             margin-top: 15px; padding: 12px 30px; background-color: #1a237e; color: white;
             border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
         }
+        .next-btn:active { transform: translateY(2px); box-shadow: none; }
     </style>
 </head>
 <body>
@@ -67,27 +69,33 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_email: decodedText, staff_email: staffEmail })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error("通信エラーが発生しました");
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     resultContainer.className = "success";
                     resultContainer.innerHTML = `
-                        <div>✅ 受付完了！</div>
-                        <div style="font-size: 0.8em; margin-top:5px;">ID: ${data.appId}</div>
+                        <div style="font-size: 1.2em;">✅ 受付完了！</div>
+                        <div style="font-size: 0.8em; margin-top:5px; color:#555;">応募ID: ${data.appId}</div>
                         <button class="next-btn" onclick="resetScanner()">次の方をスキャン</button>`;
                 } else if (data.duplicate) {
                     resultContainer.className = "warning";
                     resultContainer.innerHTML = `
-                        <div>⚠️ 受付済み</div>
+                        <div style="font-size: 1.2em;">⚠️ 受付済み</div>
                         <div style="font-size: 0.8em; margin-top:5px;">このユーザーは既に記録されています。</div>
                         <button class="next-btn" style="background-color:#e65100;" onclick="resetScanner()">確認して次へ</button>`;
                 } else {
-                    throw new Error(data.message);
+                    throw new Error(data.message || "登録に失敗しました");
                 }
             })
             .catch(error => {
                 resultContainer.className = "error";
-                resultContainer.innerHTML = `<div>❌ エラー: ${error.message}</div><button class="next-btn" onclick="resetScanner()">やり直す</button>`;
+                resultContainer.innerHTML = `
+                    <div>❌ エラーが発生しました</div>
+                    <div style="font-size: 0.8em; margin-top:5px;">${error.message}</div>
+                    <button class="next-btn" style="background-color:#c62828;" onclick="resetScanner()">やり直す</button>`;
             });
         }
 
