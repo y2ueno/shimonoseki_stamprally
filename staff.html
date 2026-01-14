@@ -8,83 +8,37 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #fffde7; /* スタッフ用と一目でわかるよう背景色を変更 */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            color: #333;
+            margin: 0; padding: 20px; background-color: #fffde7;
+            display: flex; flex-direction: column; align-items: center; color: #333;
         }
-        h1 {
-            text-align: center;
-            color: #d32f2f; /* 注意を引く赤系 */
-            margin-bottom: 20px;
-            font-size: 20px;
-        }
+        h1 { text-align: center; color: #d32f2f; margin-bottom: 20px; font-size: 20px; }
         #qr-reader-container {
-            background-color: #ffffff;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-            width: 100%;
-            max-width: 500px;
-            box-sizing: border-box;
+            background-color: #ffffff; padding: 25px; border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); width: 100%; max-width: 500px; box-sizing: border-box;
         }
-        #qr-reader {
-            width: 100%;
-            border: 2px solid #fbc02d;
-            border-radius: 8px;
-            overflow: hidden;
-            margin-bottom: 20px;
-        }
+        #qr-reader { width: 100%; border: 2px solid #fbc02d; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
         #staff-info-display {
-            text-align: center;
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #fff9c4;
-            color: #f57f17;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 0.9em;
-            border: 1px solid #fff176;
+            text-align: center; margin-bottom: 15px; padding: 10px; background-color: #fff9c4;
+            color: #f57f17; border-radius: 6px; font-weight: bold; font-size: 0.9em; border: 1px solid #fff176;
         }
         #qr-reader-results {
-            margin-top: 15px;
-            text-align: center;
-            font-weight: bold;
-            padding: 12px;
-            border-radius: 6px;
-            word-break: break-all;
-            font-size: 1em;
-            min-height: 60px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            margin-top: 15px; text-align: center; font-weight: bold; padding: 12px;
+            border-radius: 6px; word-break: break-all; font-size: 1em; min-height: 60px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         #qr-reader-results.info { background-color: #e3f2fd; color: #1e88e5; }
         #qr-reader-results.success { background-color: #e8f5e9; color: #2e7d32; border: 2px solid #4caf50; }
+        #qr-reader-results.warning { background-color: #fff3e0; color: #e65100; border: 2px solid #ff9800; }
         #qr-reader-results.error { background-color: #ffebee; color: #c62828; border: 2px solid #ef5350; }
         
         .next-btn {
-            margin-top: 15px;
-            padding: 12px 30px;
-            background-color: #1a237e;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            margin-top: 15px; padding: 12px 30px; background-color: #1a237e; color: white;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;
         }
-        .next-btn:active { transform: translateY(2px); box-shadow: none; }
     </style>
 </head>
 <body>
     <h1>【スタッフ専用】応募受付</h1>
-
     <div id="qr-reader-container">
         <div id="staff-info-display">スタッフ情報読み込み中...</div>
         <div id="qr-reader"></div>
@@ -92,14 +46,7 @@
     </div>
 
     <script>
-        /**
-         * 1. 設定：VercelのエンドポイントURL
-         */
         const VERCEL_ENDPOINT = "https://shimonoseki-stamprally.vercel.app/api/index";
-
-        /**
-         * 2. 初期設定：スタッフEmailの取得
-         */
         const urlParams = new URLSearchParams(window.location.search);
         const staffEmail = urlParams.get('staff_email') || "不明なスタッフ";
         document.getElementById('staff-info-display').textContent = "担当スタッフ: " + staffEmail;
@@ -107,56 +54,43 @@
         const resultContainer = document.getElementById('qr-reader-results');
         let isProcessing = false;
 
-        /**
-         * 3. スキャン成功時の処理
-         */
         function onScanSuccess(decodedText) {
-            if (isProcessing) return; // 重複送信防止
+            if (isProcessing) return;
             isProcessing = true;
-
-            // カメラを一時停止（演出と二重読み取り防止）
             html5QrcodeScanner.pause(true);
 
             resultContainer.className = "info";
-            resultContainer.innerHTML = "<div>⏳ データ送信中...</div>";
+            resultContainer.innerHTML = "<div>⏳ 照合中...</div>";
 
-            // Vercel(プロキシ)を通じてGASへデータを送る
             fetch(VERCEL_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_email: decodedText,
-                    staff_email: staffEmail
-                })
+                body: JSON.stringify({ user_email: decodedText, staff_email: staffEmail })
             })
             .then(response => response.json())
             .then(data => {
-                // GASからのレスポンス(status: "success")を確認
-                if (data.status === "success" || data.success) {
+                if (data.success) {
                     resultContainer.className = "success";
                     resultContainer.innerHTML = `
-                        <div style="font-size: 1.2em;">✅ 受付完了！</div>
-                        <div style="font-size: 0.8em; margin-top:5px; color:#555;">応募ID: ${data.appId || '記録済み'}</div>
-                        <button class="next-btn" onclick="resetScanner()">次の方をスキャン</button>
-                    `;
+                        <div>✅ 受付完了！</div>
+                        <div style="font-size: 0.8em; margin-top:5px;">ID: ${data.appId}</div>
+                        <button class="next-btn" onclick="resetScanner()">次の方をスキャン</button>`;
+                } else if (data.duplicate) {
+                    resultContainer.className = "warning";
+                    resultContainer.innerHTML = `
+                        <div>⚠️ 受付済み</div>
+                        <div style="font-size: 0.8em; margin-top:5px;">このユーザーは既に記録されています。</div>
+                        <button class="next-btn" style="background-color:#e65100;" onclick="resetScanner()">確認して次へ</button>`;
                 } else {
-                    throw new Error(data.message || "登録に失敗しました");
+                    throw new Error(data.message);
                 }
             })
             .catch(error => {
                 resultContainer.className = "error";
-                resultContainer.innerHTML = `
-                    <div>❌ エラーが発生しました</div>
-                    <div style="font-size: 0.8em; margin-top:5px;">${error.message}</div>
-                    <button class="next-btn" style="background-color:#d32f2f;" onclick="resetScanner()">やり直す</button>
-                `;
-                console.error('Error:', error);
+                resultContainer.innerHTML = `<div>❌ エラー: ${error.message}</div><button class="next-btn" onclick="resetScanner()">やり直す</button>`;
             });
         }
 
-        /**
-         * 4. 次のスキャンのためのリセット処理
-         */
         function resetScanner() {
             isProcessing = false;
             resultContainer.className = "info";
@@ -164,17 +98,7 @@
             html5QrcodeScanner.resume();
         }
 
-        /**
-         * 5. スキャナーの初期化と開始
-         */
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-            "qr-reader", 
-            { 
-                fps: 10,      // フレームレート
-                qrbox: 250,   // スキャン領域のサイズ
-                rememberLastUsedCamera: true // 最後に使ったカメラを記憶
-            }
-        );
+        const html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 });
         html5QrcodeScanner.render(onScanSuccess);
     </script>
 </body>
