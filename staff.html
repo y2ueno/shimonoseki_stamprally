@@ -69,10 +69,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_email: decodedText, staff_email: staffEmail })
             })
-            .then(response => {
-                if (!response.ok) throw new Error("通信エラーが発生しました");
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     resultContainer.className = "success";
